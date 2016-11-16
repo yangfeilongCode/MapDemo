@@ -54,24 +54,23 @@ public class TreasureView extends RelativeLayout{
 
     /**
      * 可不可以对外提供一个方法，自动的填充视图：
-     *
+     * 将宝藏信息传入过来，在这个视图里面进行视图的填充？
      */
     public void bindTreasure(@NonNull Treasure treasure){
         //可以完成宝藏标题等的展示
-        tvTitle.setText(treasure.getTitle());
-        tvLocation.setText(treasure.getLocation());
-        //计算宝藏与我的距离
-        double distance=0.00d;  //距离
-        LatLng myLoncation= MapFragment.getMyLocation(); //拿到我们的位置
-        if (myLoncation==null){
-            distance=0.00d;
+        tvTitle.setText(treasure.getTitle());// 宝藏标题
+        tvLocation.setText(treasure.getLocation());// 宝藏地址
+        // 计算距离我们有多远
+        double distance = 0.00d;// 距离
+        LatLng myLocation = MapFragment.getMyLocation();// 拿到我们的位置
+        if(myLocation==null){
+            distance = 0.00d;
         }
+        LatLng target = new LatLng(treasure.getLatitude(),treasure.getLongitude());// 拿到宝藏的位置
+        distance = DistanceUtil.getDistance(target,myLocation);// 得到我们离宝藏的距离
 
-        LatLng target=new LatLng(treasure.getLatitude(),treasure.getLongitude()); //拿到宝藏的位置
-        distance= DistanceUtil.getDistance(target,myLoncation); //得到距离宝藏的距离
-
-        DecimalFormat decimalFormat=new DecimalFormat("#0.00");
-        String text=decimalFormat.format(distance/1000)+"km";
+        DecimalFormat decimalFormat = new DecimalFormat("#0.00");
+        String text = decimalFormat.format(distance/1000)+"km";
         tv_Distance.setText(text);
     }
 

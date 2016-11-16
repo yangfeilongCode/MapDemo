@@ -51,6 +51,10 @@ public class MapPresenter {
                     mapMvpView.showMessage("发生了未知的错误");
                     return;
                 }
+                //添加宝物
+                TreasureRepo.getInstance().addTreasure(treasureList);
+                TreasureRepo.getInstance().cache(area); //隐藏区域
+
                 mapMvpView.setData(treasureList);
             }
     }

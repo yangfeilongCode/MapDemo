@@ -31,7 +31,7 @@ public class UserPrefs {
     }
 
     public void setTokenid(int tokenid) {
-        preferences.edit().putInt(KEY_TOKENID, tokenid).apply();
+        preferences.edit().putInt(KEY_TOKENID, tokenid).commit();
     }
 
     public void setPhoto(String photoUrl) {

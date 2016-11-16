@@ -34,10 +34,13 @@ public class NetClient {
                 .addInterceptor(loggingInterceptor)
                 .build();
 
+        // 非严格模式
+        Gson gson = new GsonBuilder().setLenient().create();
+
         retrofit = new Retrofit.Builder()
                 .baseUrl(BASE_URL)
-                        // 添加gson转换器(注意要加依赖)
-                .addConverterFactory(GsonConverterFactory.create())
+                // 添加gson转换器(注意要加依赖)
+                .addConverterFactory(GsonConverterFactory.create(gson))
                 .client(client)
                 .build();
     }
@@ -62,7 +65,6 @@ public class NetClient {
         }
         return userApi;
     }
-
     /**
      * 获取宝藏API对象
      */
@@ -72,10 +74,6 @@ public class NetClient {
         }
         return treasureApi;
     }
-
-    /**
-     * 获取宝藏API对象
-     */
 
     public OkHttpClient getClient() {
         return client;

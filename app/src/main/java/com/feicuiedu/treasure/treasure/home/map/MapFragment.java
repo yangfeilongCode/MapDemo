@@ -1,6 +1,8 @@
 package com.feicuiedu.treasure.treasure.home.map;
 
 
+
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
@@ -39,8 +41,6 @@ import com.baidu.mapapi.search.geocode.GeoCoder;
 import com.baidu.mapapi.search.geocode.OnGetGeoCoderResultListener;
 import com.baidu.mapapi.search.geocode.ReverseGeoCodeOption;
 import com.baidu.mapapi.search.geocode.ReverseGeoCodeResult;
-import com.daimajia.androidanimations.library.Techniques;
-import com.daimajia.androidanimations.library.YoYo;
 import com.feicuiedu.treasure.R;
 import com.feicuiedu.treasure.commons.ActivityUtils;
 import com.feicuiedu.treasure.components.TreasureView;
@@ -57,9 +57,9 @@ import butterknife.OnClick;
 import butterknife.Unbinder;
 
 /**
- *
+ * 放置在HomeActivity里面，主要展示的就是地图，宝藏展示、宝藏详情、埋藏宝藏都是在这个里面来进行
  */
-public class MapFragment extends Fragment implements MapMvpView{
+public class MapFragment extends Fragment implements MapMvpView {
 
     @BindView(R.id.map_frame)
     FrameLayout mapFrame;
@@ -87,16 +87,21 @@ public class MapFragment extends Fragment implements MapMvpView{
     private static LatLng myLocation;
     private ActivityUtils activityUtils;
 
+    private String address;//反地理编码结果
+    private GeoCoder geoCoder;//地理查询变量
+
     private LatLng target;// 用来暂时保存一下当前地图的位置，方便我们判断地图的位置有没有变化
 
+    private static String myAddress;
+
     private boolean isFirstLocate = true;// 这个主要是用来判断是不是第一进来的时候的定位
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-
         View view = inflater.inflate(R.layout.fragment_map, container, false);
         bind = ButterKnife.bind(this, view);
-        activityUtils=new ActivityUtils(this);
+        activityUtils = new ActivityUtils(this);
         return view;
     }
 
@@ -107,11 +112,46 @@ public class MapFragment extends Fragment implements MapMvpView{
         // 初始化百度地图
         initBaiduMap();
 
-
         // 初始化定位相关
-      initLocation();
+        initLocation();
+
+        //初始化地理编码相关
+        initGeoCoder();
     }
 
+  //初始化地理编码
+    private void initGeoCoder(){
+        //创建地理查询变量
+        geoCoder=GeoCoder.newInstance();
+        //设置地理编码监听
+        geoCoder.setOnGetGeoCodeResultListener(onGetGeoCoderResultListener);
+    }
+    private OnGetGeoCoderResultListener onGetGeoCoderResultListener=new OnGetGeoCoderResultListener() {
+        //地理编码：地址-->经纬度
+        @Override
+        public void onGetGeoCodeResult(GeoCodeResult geoCodeResult) {
+
+        }
+        //反地理编码：经纬度-->地址
+        @Override
+        public void onGetReverseGeoCodeResult(ReverseGeoCodeResult reverseGeoCodeResult) {
+             if(reverseGeoCodeResult==null){
+                 address="未知";
+                 return;
+             }
+            //没有问题的时候
+            if (reverseGeoCodeResult.error== SearchResult.ERRORNO.NO_ERROR){
+                address="未知";
+            }
+
+            //得到反地理编码的结果
+            address=reverseGeoCodeResult.getAddress();
+            //将结果反馈给卡片标题录入地址上
+            tvCurrentLocation.setText(address);
+        }
+    };
+
+    //初始化位置
     private void initLocation() {
         /**
          * 1. 开启定位图层
@@ -154,6 +194,9 @@ public class MapFragment extends Fragment implements MapMvpView{
             // 拿到定位的位置
             myLocation = new LatLng(lat, lng);
 
+            // 拿到定位的地址
+            myAddress = bdLocation.getAddrStr();
+
             MyLocationData myLocationData = new MyLocationData.Builder()
                     .longitude(lng)
                     .latitude(lat)
@@ -168,10 +211,15 @@ public class MapFragment extends Fragment implements MapMvpView{
         }
     };
 
-    public static LatLng getMyLocation(){
+    public static LatLng getMyLocation() {
         return myLocation;
     }
 
+    public static String getMyAddress(){
+        return myAddress;
+    }
+
+    //初始化地图
     private void initBaiduMap() {
 
         // 查看百度地图的ＡＰＩ
@@ -201,8 +249,7 @@ public class MapFragment extends Fragment implements MapMvpView{
 
         // 怎么对地图状态进行监听？
         baiduMap.setOnMapStatusChangeListener(mapStatusChangeListener);
-        //地图标的点击事件
-        baiduMap.setOnMarkerClickListener(clickListener);
+        baiduMap.setOnMarkerClickListener(markerListener);
 
     }
 
@@ -229,6 +276,7 @@ public class MapFragment extends Fragment implements MapMvpView{
         MapStatusUpdate update = MapStatusUpdateFactory.newMapStatus(mapStatus);
         baiduMap.animateMapStatus(update);
     }
+
     //指南调正
     @OnClick(R.id.tv_compass)
     public void switchCompass() {
@@ -238,7 +286,8 @@ public class MapFragment extends Fragment implements MapMvpView{
         boolean isCompass = baiduMap.getUiSettings().isCompassEnabled();
         baiduMap.getUiSettings().setCompassEnabled(!isCompass);
     }
-   //放大缩小控件
+
+    //按比例放大缩小
     @OnClick({R.id.iv_scaleUp, R.id.iv_scaleDown})
     public void onClick(View view) {
         switch (view.getId()) {
@@ -250,24 +299,32 @@ public class MapFragment extends Fragment implements MapMvpView{
                 break;
         }
     }
-   //点击宝藏视图
+
+    //宝藏试图
     @OnClick(R.id.treasureView)
-    public void clickTreasureView() {  //点击宝藏
+    public void clickTreasureView() {
         // 跳转到详情页面，宝藏传递过去
         int id = currentMarker.getExtraInfo().getInt("id");
         Treasure treasure = TreasureRepo.getInstance().getTreasure(id);
         TreasureDetailActivity.open(getContext(),treasure);
     }
 
-
-
+    //埋藏宝藏
+    @OnClick(R.id.hide_treasure)
+    public void clickHideTreasure(){
+        //处理埋藏宝藏的卡片标题录入和跳转
+        //找到我们输入的宝藏标题
+        String title=etTreasureTitle.getText().toString();
+        if (TextUtils.isEmpty(title)){
+            activityUtils.showToast("请输入宝藏标题");
+        }
+    }
 
 
     // 百度地图状态的监听
     private BaiduMap.OnMapStatusChangeListener mapStatusChangeListener = new BaiduMap.OnMapStatusChangeListener() {
         @Override
         public void onMapStatusChangeStart(MapStatus mapStatus) {
-
         }
 
         @Override
@@ -277,45 +334,53 @@ public class MapFragment extends Fragment implements MapMvpView{
 
         @Override
         public void onMapStatusChangeFinish(MapStatus mapStatus) {
-            //当地图的状态发生变化时，动态的去获取某区宇德的宝藏数据
+            // 当地图的状态发生变化时，动态的去获取某区域内的宝藏数据
 
-            //地图状态发生变化
-           LatLng target=mapStatus.target;
-            //判断位置有没有变化
-            if (target!=MapFragment.this.target){
+            // 地图状态发生变化了
+            LatLng target = mapStatus.target;
+            // 判断位置有没有变化
+            if (target != MapFragment.this.target) {
 
                 // 位置发生变化了，去进行此位置周边的宝藏数据获取，提供方法来进行
                 updateMapArea();
 
-                //将位置更新为变化后的位置
-                MapFragment.this.target=target;
+         //在地图变化中实时的请求反地理编码，得到反地理编码的结果
+                //设置反地理编码的位置
+                ReverseGeoCodeOption option=new ReverseGeoCodeOption();
+                option.location(target);
+                //发起反地理编码
+                geoCoder.reverseGeoCode(option);
+
+                // 将位置更新为变化后的位置
+                MapFragment.this.target = target;
             }
         }
     };
-  //位置发生变化，区域也发生变化，更新区域，动态获取区域内的数据
-    public void updateMapArea(){
 
-        MapStatus mapStatus=baiduMap.getMapStatus();
-        //获取经纬度
-        double lng=mapStatus.target.longitude;
-        double lat=mapStatus.target.latitude;
+    // 位置发生变化了，区域也变化了，更新区域，动态获取区域内数据
+    private void updateMapArea() {
 
-        Area area=new Area();
-        //经纬度的向上取整
-        area.setMaxLat(Math.ceil(lat));
+        MapStatus mapStatus = baiduMap.getMapStatus();
+
+        // 获取经纬度
+        double lng = mapStatus.target.longitude;
+        double lat = mapStatus.target.latitude;
+
+        Area area = new Area();
+        area.setMaxLat(Math.ceil(lat));//经纬度的向上取整
         area.setMaxLng(Math.ceil(lng));
-        //经纬度的向下取整
-        area.setMinLat(Math.floor(lat));
+        area.setMinLat(Math.floor(lat));// 经纬度的向下取整
         area.setMinLng(Math.floor(lng));
 
-        //根据区域来进行获取数据
+        // 根据区域来进行数据的获取
         new MapPresenter(this).getTreasure(area);
     }
+
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        bind.unbind();  //解绑
+        bind.unbind();
     }
 
     @Override
@@ -325,51 +390,52 @@ public class MapFragment extends Fragment implements MapMvpView{
 
     @Override
     public void setData(List<Treasure> list) {
-        // TODO 我们要将拿到的宝藏数据以添加覆盖物的形式展示
         for (Treasure treasure : list) {
-            //获取经纬度
-            LatLng latLng = new LatLng(treasure.getLatitude(), treasure.getLongitude());
+            LatLng lat = new LatLng(treasure.getLatitude(), treasure.getLongitude());
             // 要在经纬度处添加覆盖物Marker
-            addMarker(latLng, treasure.getId());
+            addMarker(lat, treasure.getId());
         }
     }
-    private BitmapDescriptor dot=BitmapDescriptorFactory.fromResource(R.drawable.treasure_dot);
-    private BitmapDescriptor dot_click=BitmapDescriptorFactory.fromResource(R.drawable.treasure_expanded);
-    //添加宝藏的覆盖物，每一个覆盖物中都包含各自的宝藏信息
-    public void addMarker(LatLng latLng,int treasureId){
 
-        MarkerOptions options=new MarkerOptions();
-        options.position(latLng);//位置
-        options.icon(dot);//图片
-        options.anchor(0.5f,0.5f);//覆盖物锚点
+    private BitmapDescriptor dot_click = BitmapDescriptorFactory.fromResource(R.drawable.treasure_expanded);
+    private BitmapDescriptor dot = BitmapDescriptorFactory.fromResource(R.drawable.treasure_dot);
 
-        Bundle bundle=new Bundle();  //绑定
-        bundle.putInt("id",treasureId); //传id
-        options.extraInfo(bundle);  //覆盖物额外信息
-        baiduMap.addOverlay(options);//添加覆盖物
+    // 添加宝藏的覆盖物，每一个覆盖物中都包含各自的宝藏信息
+    private void addMarker(LatLng lat, int treasureId) {
 
+        MarkerOptions options = new MarkerOptions();
+        options.position(lat);// 设置位置
+        options.icon(dot);// 设置覆盖物的图标
+        options.anchor(0.5f, 0.5f);// 设置描点
+
+        Bundle bundle = new Bundle();
+        bundle.putInt("id", treasureId);
+        options.extraInfo(bundle);
+        baiduMap.addOverlay(options);
     }
 
-    private Marker currentMarker;//标记
-    //标记点击监听事件
-    private BaiduMap.OnMarkerClickListener clickListener=new BaiduMap.OnMarkerClickListener() {
+    private Marker currentMarker;
+
+    private BaiduMap.OnMarkerClickListener markerListener = new BaiduMap.OnMarkerClickListener() {
         @Override
         public boolean onMarkerClick(Marker marker) {
-          if (currentMarker!=null){ //标记为空
-              currentMarker.setVisible(true); //展示宝藏数据弹框
-          }
-            currentMarker=marker; //重新设置标记
-            currentMarker.setVisible(false); //隐藏宝物数据
 
-            InfoWindow infoWindow=new InfoWindow(dot_click,currentMarker.getPosition(),0,infoWindowClickListener);
+            if (currentMarker != null) {
+                currentMarker.setVisible(true);
+            }
+            currentMarker = marker;
+            currentMarker.setVisible(false);
+
+            InfoWindow infoWindow = new InfoWindow(dot_click, marker.getPosition(), 0, infowindowListener);
             baiduMap.showInfoWindow(infoWindow);
 
-            //取出当前的Marker宝藏信息
-            int id=marker.getExtraInfo().getInt("id");
-            Log.e("aaaaa", "id --------"+id );
-            Treasure treasure=TreasureRepo.getInstance().getTreasure(id);
-            Log.e("aaaaa", "bindTreasure --------"+treasure );
+            // 取出当前的Marker的宝藏信息
+            int id = marker.getExtraInfo().getInt("id");
+            Log.e("aaaaa", "id----- "+id );
+            Treasure treasure = TreasureRepo.getInstance().getTreasure(id);
+            Log.e("aaaaa", "treasure----- "+treasure );
             treasureView.bindTreasure(treasure);
+
             /**
              * 切换到宝藏选中视图
              */
@@ -378,46 +444,50 @@ public class MapFragment extends Fragment implements MapMvpView{
             return false;
         }
     };
-    //信息弹框点击事件
-    private InfoWindow.OnInfoWindowClickListener infoWindowClickListener=new InfoWindow.OnInfoWindowClickListener() {
+    private InfoWindow.OnInfoWindowClickListener infowindowListener = new InfoWindow.OnInfoWindowClickListener() {
         @Override
         public void onInfoWindowClick() {
-            //TODO  隐藏
-       changeUIMode(UI_MODE_NORMAL); //切回普通视图
+            // 切换回普通视图
+            changeUIMode(UI_MODE_NORMAL);
 
         }
     };
 
+    private static final int UI_MODE_NORMAL = 0;// 普通的视图
+    private static final int UI_MODE_SECLECT = 1;// 宝藏选中视图
+    private static final int UI_MODE_HIDE = 2;// 埋藏宝藏视图
 
+    private int uiMode = UI_MODE_NORMAL;
 
-    private static final int UI_MODE_NORMAL=0;//普通视图
-    private static final int UI_MODE_SECLECT=1;//宝藏选中视图
-    private static final int UI_MODE_HIDE=2;//埋藏视图
+    // 提供一个方法：用来切换视图
+    private void changeUIMode(int uiMode) {
 
-    private int uiMode= UI_MODE_NORMAL;
-
-    //提供一个方法：用来切换地图
-    private void changeUIMode(int uiMode){
-        if (this.uiMode==uiMode){
+        if (this.uiMode == uiMode) {
             return;
         }
-        this.uiMode=uiMode;
-        switch (uiMode){
-            case UI_MODE_NORMAL:
-                if (currentMarker!=null){
+        this.uiMode = uiMode;
+        switch (uiMode) {
+
+            // 普通的视图
+            case UI_MODE_NORMAL: {
+                if (currentMarker != null) {
                     currentMarker.setVisible(true);
                 }
                 baiduMap.hideInfoWindow();
                 layoutBottom.setVisibility(View.GONE);
                 centerLayout.setVisibility(View.GONE);
-                break;
-            case UI_MODE_SECLECT:
-                layoutBottom.setVisibility(View.VISIBLE); //宝藏信息展示
-                treasureView.setVisibility(View.VISIBLE); //展示宝藏信息卡片
-                centerLayout.setVisibility(View.GONE);  //埋藏宝藏地点
-                hideTreasure.setVisibility(View.GONE);  //隐藏宝藏信息卡片
-                break;
-            case UI_MODE_HIDE:
+            }
+            break;
+            // 宝藏选中视图
+            case UI_MODE_SECLECT: {
+                layoutBottom.setVisibility(View.VISIBLE);
+                treasureView.setVisibility(View.VISIBLE);
+                centerLayout.setVisibility(View.GONE);
+                hideTreasure.setVisibility(View.GONE);
+            }
+            break;
+            // 埋藏宝藏的视图
+            case UI_MODE_HIDE: {
                 centerLayout.setVisibility(View.VISIBLE);
                 layoutBottom.setVisibility(View.GONE);
                 btnHideHere.setOnClickListener(new View.OnClickListener() {
@@ -428,8 +498,22 @@ public class MapFragment extends Fragment implements MapMvpView{
                         treasureView.setVisibility(View.GONE);
                     }
                 });
-                break;
-
+            }
+            break;
         }
+    }
+
+
+    public void switchToHideTreasure() {
+        changeUIMode(UI_MODE_HIDE);
+    }
+
+    // 按下Back键来调用
+    public boolean clickBackPressed(){
+        if (this.uiMode!=UI_MODE_NORMAL){
+            changeUIMode(UI_MODE_NORMAL);
+            return false;
+        }
+        return true;
     }
 }

@@ -17,8 +17,10 @@ import com.feicuiedu.treasure.MainActivity;
 import com.feicuiedu.treasure.R;
 import com.feicuiedu.treasure.commons.ActivityUtils;
 import com.feicuiedu.treasure.treasure.TreasureRepo;
+import com.feicuiedu.treasure.treasure.home.list.TreasureListFragment;
 import com.feicuiedu.treasure.treasure.home.map.MapFragment;
 import com.feicuiedu.treasure.user.UserPrefs;
+import com.feicuiedu.treasure.user.account.AccountActivity;
 import com.nostra13.universalimageloader.core.ImageLoader;
 
 import butterknife.BindView;
@@ -38,6 +40,7 @@ public class HomeActivity extends AppCompatActivity implements NavigationView.On
     private ImageView imageView;
 
     private MapFragment mapFragment;
+    private TreasureListFragment listFragment;
 
     private FragmentManager fragmentManager;
 
@@ -81,6 +84,11 @@ public class HomeActivity extends AppCompatActivity implements NavigationView.On
         toggle.syncState();
         //
         imageView = (ImageView) navigationView.getHeaderView(0).findViewById(R.id.iv_userIcon);
+        imageView.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                activityUtils.startActivity(AccountActivity.class);
+            }
+        });
     }
 
     @Override
@@ -88,6 +96,8 @@ public class HomeActivity extends AppCompatActivity implements NavigationView.On
         switch (item.getItemId()) {
             case R.id.menu_item_hide: // 埋藏宝藏
                 drawerLayout.closeDrawer(GravityCompat.START);
+                // 切换到埋藏宝藏视图
+                mapFragment.switchToHideTreasure();
                 break;
             case R.id.menu_item_logout:// 退出登录
                 drawerLayout.closeDrawer(GravityCompat.START);
@@ -98,5 +108,67 @@ public class HomeActivity extends AppCompatActivity implements NavigationView.On
         }
         // 返回true,当前选项变为checked状态
         return false;
+    }
+
+    // 准备
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        MenuItem item = menu.findItem(R.id.action_toggle);
+        // 正在用List的方式显示
+        if (listFragment!=null && listFragment.isAdded()){
+            item.setIcon(R.drawable.ic_map);
+        }else {
+            item.setIcon(R.drawable.ic_view_list);
+        }
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    // 创建
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_home, menu);
+        return true;
+    }
+
+    // 选择
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.action_toggle:
+                showListFragment();
+                // 通过此方法,将使得onPrepareOptionsMenu方法得到触发
+                invalidateOptionsMenu();
+                break;
+            case android.R.id.home:
+                finish();
+                break;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void showListFragment() {
+        // 当前显示的就是List
+        if(listFragment != null && listFragment.isAdded()) {
+            fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+            fragmentManager.beginTransaction().remove(listFragment).commit();
+            return;
+        }
+        listFragment = new TreasureListFragment();
+        fragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, listFragment)
+                .addToBackStack(null)
+                .commit();
+    }
+
+    // 处理按下Back键
+    @Override
+    public void onBackPressed() {
+        if (drawerLayout.isDrawerOpen(GravityCompat.START)){
+            drawerLayout.closeDrawer(GravityCompat.START);
+        }else {
+            if (mapFragment.clickBackPressed()){
+                super.onBackPressed();
+            }
+        }
     }
 }
